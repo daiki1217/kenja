@@ -4,12 +4,15 @@ import io
 import os
 import git.refs
 from gitdb import IStream
+from gitdb.db.mem import MemoryDB
 from gitdb.util import bin_to_hex
 from StringIO import StringIO
 from collections import deque
 
 blob_mode = '100644'
 tree_mode = '40000'
+
+memdb = MemoryDB()
 
 
 def tree_item_str(mode, file_name, binsha):
@@ -39,6 +42,7 @@ def write_blob_from_file(odb, f, line_size):
 
 
 def write_syntax_tree_from_file(odb, src_path):
+    odb = memdb
     if not os.path.isfile(src_path):
         raise Exception
 
