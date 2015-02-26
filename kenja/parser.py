@@ -51,7 +51,7 @@ class ParserExecutor:
 
 
 class JavaParserExecutor(ParserExecutor):
-    parser_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'java/java-parser.jar')
+    parser_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'java', 'java-parser.jar')
 
     def make_cmd(self, hexsha):
         cmd = ["java",
@@ -63,7 +63,7 @@ class JavaParserExecutor(ParserExecutor):
 
 
 class JavaConsumer(Process):
-    parser_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'java/java-parser.jar')
+    parser_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib', 'java', 'java-parser.jar')
 
     def __init__(self, blobs_queue, repo_path, output_dir):
         Process.__init__(self)
