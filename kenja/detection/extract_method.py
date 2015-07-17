@@ -7,6 +7,8 @@ from pyrem_torq import script
 from kenja.historage import *
 from kenja.git.diff import GitDiffParser
 from kenja.shingles import tokenizer, split_to_str, calculate_similarity
+import csv
+import sys
 
 
 diff_parser = GitDiffParser()
@@ -89,6 +91,36 @@ def detect_extract_method(historage):
                 continue
             for p in commit.parents:
                 extract_method_information.extend(detect_extract_method_from_commit(p, commit))
+                detection_stack.append(p)
+            checked_commit.add(commit.hexsha)
+
+    return extract_method_information
+
+def detect_extract_method_multi(historage):
+    extract_method_information = []
+
+    checked_commit = set()
+    detection_stack = []
+    target_stack = []
+    for ref in get_refs(historage):
+        ref_commit = historage.commit(ref)
+        detection_stack.append(ref_commit)
+        while detection_stack:
+            commit = detection_stack.pop()
+            checked_targetcommit = set()
+            if commit.hexsha in checked_commit:
+                continue
+            for p in commit.parents:
+                extract_method_information.extend(detect_extract_method_from_commit(p, commit))
+                target_stack.append(p)
+                while target_stack:
+                    target = target_stack.pop()
+                    if target.hexsha in checked_targetcommit:
+                        continue
+                    for q in target.parents:
+                        extract_method_information.extend(detect_extract_method_from_commit(q, commit))
+                        target_stack.append(q)
+                        checked_targetcommit.add(q.hexsha)
                 detection_stack.append(p)
             checked_commit.add(commit.hexsha)
 
@@ -203,6 +235,29 @@ def detect_extract_method_from_commit(old_commit, new_commit):
 
     return result
 
+def print_csv(candidates):
+        fieldnames = ('a_commit',
+                      'b_commit',
+                      'b_org_commit',
+                      'a_package',
+                      'target_class',
+                      'target_method',
+                      'b_package',
+                      'extracted_method',
+                      'similarity',
+                      'extracted_body',
+                      'target_before_body',
+                      'target_after_body',
+                      'target_deleted_lines',
+                      'target_method_path',
+                      'extracted_method_path'
+                      )
+        for candidate in candidates:
+            candidate['target_deleted_lines'] = '\n'.join(candidate['target_deleted_lines'])
+
+        writer = csv.DictWriter(sys.stdout, fieldnames)
+        writer.writeheader()
+        writer.writerows(candidates)
 
 if __name__ == '__main__':
     import argparse
@@ -214,11 +269,34 @@ if __name__ == '__main__':
 
     historage = Repo(args.historage_dir)
     extract_method_information = detect_extract_method(historage)
+    extract_method_information_multi = detect_extract_method_multi(historage)
 
     candidate_revisions = set()
     for info in extract_method_information:
-        candidate_revisions.add(info[0])
-        print('"%s","%s","%s","%s","%s","%s","%s","%s"' % info)
+        candidate_revisions.add(info["a_commit"])
+        #print('a_commit:', info["a_commit"])
+        #print('b_commit:', info["b_commit"])    
+        #print('b_org_commit:', info["b_org_commit"])
+        #print('a_package:', info["a_package"])
+        #print('b_package:', info["b_package"])
+        #print('target_class:', info["target_class"])    
+        #print('target_method:', info["target_method"])
+        #print('extracted_method:', info["extracted_method"])
+        #print('similarity:', info["similarity"])
+        #print('target_before_body:', info["target_before_body"])    
+        #print('target_after_body:', info["target_after_body"])
+        #print('extracted_body:', info["extracted_body"])
+        #print('target_deleted_lines:', info["target_deleted_lines"])
+        #print('target_method_path:', info["target_method_path"])    
+        #print('extracted_method_path:', info["extracted_method_path"])
 
+    candidate_revisions_multi = set()
+    for info in extract_method_information_multi:
+        candidate_revisions_multi.add(info["a_commit"])
+
+    #print_csv(extract_method_information)
+    #print_csv(extract_method_information_multi)
     print('candidates:', len(extract_method_information))
     print('candidate revisions:', len(candidate_revisions))
+    print('candidates multi:', len(extract_method_information_multi))
+    print('candidate revisions multi:', len(candidate_revisions_multi))
