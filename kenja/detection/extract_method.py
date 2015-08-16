@@ -101,23 +101,24 @@ def detect_extract_method(historage):
 def detect_extract_method_multi(historage):
     extract_method_information = []
 
-    checked_commit_pair = []
+    checked_commit_pair = set()
     ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
     for ref in get_refs(historage):
         for commit in historage.iter_commits(ref):
-            detection_stack = []
-            detection_stack.append(commit)
-            for target_commit in detection_stack:
+            detection_queue = deque()
+            detection_queue.append(commit)
+            while detection_queue:
+                target_commit = detection_queue.pop()
                 for p in target_commit.parents:
-                    if [commit.hexsha, p.hexsha] not in checked_commit_pair:
+                    if (commit.hexsha, p.hexsha) not in checked_commit_pair:
                         print p.hexsha, commit.hexsha, ordered_commits.index(p), ordered_commits.index(commit)
                         res = detect_extract_method_from_commit(p, commit)
                         if len(res) != 0:
                             res[0]['a_commit_index'] = ordered_commits.index(p)
                             res[0]['b_commit_index'] = ordered_commits.index(commit)
                             extract_method_information.extend(res)
-                        checked_commit_pair.append([commit.hexsha, p.hexsha])
-                    detection_stack.append(p)
+                        checked_commit_pair.add((commit.hexsha, p.hexsha))
+                        detection_queue.append(p)
 
     return extract_method_information
 
@@ -264,20 +265,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     historage = Repo(args.historage_dir)
-    #extract_method_information = detect_extract_method(historage)
+    extract_method_information = detect_extract_method(historage)
     extract_method_information_multi = detect_extract_method_multi(historage)
 
-    #candidate_revisions = set()
-    #for info in extract_method_information:
-        #candidate_revisions.add(info["a_commit"])
+    candidate_revisions = set()
+    for info in extract_method_information:
+        candidate_revisions.add(info["a_commit"])
 
     candidate_revisions_multi = set()
     for info in extract_method_information_multi:
         candidate_revisions_multi.add(info["a_commit"])
 
-    #print_csv(extract_method_information)
-    #print_csv(extract_method_information_multi)
-    #print('candidates:', len(extract_method_information))
-    #print('candidate revisions:', len(candidate_revisions))
+    print('candidates:', len(extract_method_information))
+    print('candidate revisions:', len(candidate_revisions))
     print('candidates multi:', len(extract_method_information_multi))
     print('candidate revisions multi:', len(candidate_revisions_multi))
+
+    #print_csv(extract_method_information)
+    #print_csv(extract_method_information_multi)
