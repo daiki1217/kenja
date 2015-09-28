@@ -47,6 +47,8 @@ class RefactoringDetectionCommandParser:
     def print_csv(self, candidates):
         fieldnames = ('a_commit',
                       'b_commit',
+                      'a_commit_index', 
+                      'b_commit_index', 
                       'b_org_commit',
                       'a_package',
                       'target_class',
@@ -145,7 +147,7 @@ class RefactoringDetectionCommandParser:
             for a_commit_hash, b_commit_hash in csv.reader(open(args.commits_list)):
                 a_commit = historage.commit(a_commit_hash)
                 b_commit = historage.commit(b_commit_hash)
-                extract_method_information.extend(detect_extract_method_from_commit(a_commit, b_commit))
+                extract_method_information.extend(detect_extract_method_from_commit(a_commit, b_commit, historage))
         except ValueError:
             print "Invalid input."
             return

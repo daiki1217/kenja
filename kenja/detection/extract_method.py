@@ -82,7 +82,6 @@ def detect_extract_method(historage):
     extract_method_information = []
 
     checked_commit = set()
-    ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
     detection_stack = []
     for ref in get_refs(historage):
         ref_commit = historage.commit(ref)
@@ -92,14 +91,7 @@ def detect_extract_method(historage):
             if commit.hexsha in checked_commit:
                 continue
             for p in commit.parents:
-                print >> sys.stderr, p.hexsha, commit.hexsha, ordered_commits.index(p), ordered_commits.index(commit)
-                res = detect_extract_method_from_commit(p, commit)
-                if len(res) != 0:
-                    for re in res:
-                        re['a_commit_index'] = ordered_commits.index(p)
-                        re['b_commit_index'] = ordered_commits.index(commit)
-                    extract_method_information.extend(res)
-                #extract_method_information.extend(detect_extract_method_from_commit(p, commit))
+                extract_method_information.extend(detect_extract_method_from_commit(p, commit, historage))
                 detection_stack.append(p)
             checked_commit.add(commit.hexsha)
 
@@ -108,7 +100,6 @@ def detect_extract_method(historage):
 def detect_extract_method_multi(historage):
     extract_method_information = []
 
-    ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
     for ref in get_refs(historage):
         for commit in historage.iter_commits(ref):
             checked_commit_pair = set()
@@ -118,12 +109,8 @@ def detect_extract_method_multi(historage):
                 target_commit = detection_queue.pop()
                 for p in target_commit.parents:
                     if (commit.hexsha, p.hexsha) not in checked_commit_pair:
-                        print p.hexsha, commit.hexsha, ordered_commits.index(p), ordered_commits.index(commit)
-                        res = detect_extract_method_from_commit(p, commit)
+                        res = detect_extract_method_from_commit(p, commit, historage)
                         if len(res) != 0:
-                            for re in res:
-                                re['a_commit_index'] = ordered_commits.index(p)
-                                re['b_commit_index'] = ordered_commits.index(commit)
                             print_csv(res)
                         checked_commit_pair.add((commit.hexsha, p.hexsha))
                         detection_queue.append(p)
@@ -170,12 +157,15 @@ def get_extracted_method_candidates(diff_index):
     return (extracted_method_candidates, added_lines_dict)
 
 
-def detect_extract_method_from_commit(old_commit, new_commit):
+def detect_extract_method_from_commit(old_commit, new_commit, historage):
     result = []
 
     diff_index = old_commit.diff(new_commit, create_patch=True)
 
     extracted_method_candidates, added_lines_dict = get_extracted_method_candidates(diff_index)
+
+    ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
+    print >> sys.stderr, old_commit.hexsha, new_commit.hexsha, ordered_commits.index(old_commit), ordered_commits.index(new_commit)
 
     for diff in diff_index.iter_change_type('M'):
         a_path = diff.a_blob.path
@@ -220,6 +210,8 @@ def detect_extract_method_from_commit(old_commit, new_commit):
 
             refactoring_candidate = {'a_commit': old_commit.hexsha,
                                      'b_commit': new_commit.hexsha,
+                                     'a_commit_index': ordered_commits.index(old_commit), 
+                                     'b_commit_index': ordered_commits.index(new_commit),
                                      'b_org_commit': org_commit,
                                      'a_package': a_package,
                                      'b_package': b_package,
