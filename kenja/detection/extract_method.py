@@ -15,7 +15,6 @@ import sys
 
 diff_parser = GitDiffParser()
 
-
 def seq_outermost_node_iter(seq, label):
     # This function is fixed version of seq_outermost_node_iter.
     # Original version of this code is in the pyrem_torq.treeseq
@@ -83,6 +82,7 @@ def detect_extract_method(historage):
     extract_method_information = []
 
     checked_commit = set()
+    ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
     detection_stack = []
     for ref in get_refs(historage):
         ref_commit = historage.commit(ref)
@@ -92,7 +92,14 @@ def detect_extract_method(historage):
             if commit.hexsha in checked_commit:
                 continue
             for p in commit.parents:
-                extract_method_information.extend(detect_extract_method_from_commit(p, commit))
+                print >> sys.stderr, p.hexsha, commit.hexsha, ordered_commits.index(p), ordered_commits.index(commit)
+                res = detect_extract_method_from_commit(p, commit)
+                if len(res) != 0:
+                    for re in res:
+                        re['a_commit_index'] = ordered_commits.index(p)
+                        re['b_commit_index'] = ordered_commits.index(commit)
+                    extract_method_information.extend(res)
+                #extract_method_information.extend(detect_extract_method_from_commit(p, commit))
                 detection_stack.append(p)
             checked_commit.add(commit.hexsha)
 
@@ -101,10 +108,10 @@ def detect_extract_method(historage):
 def detect_extract_method_multi(historage):
     extract_method_information = []
 
-    checked_commit_pair = set()
     ordered_commits = get_reversed_topological_ordered_commits(historage, get_refs(historage))
     for ref in get_refs(historage):
         for commit in historage.iter_commits(ref):
+            checked_commit_pair = set()
             detection_queue = deque()
             detection_queue.append(commit)
             while detection_queue:
@@ -114,9 +121,10 @@ def detect_extract_method_multi(historage):
                         print p.hexsha, commit.hexsha, ordered_commits.index(p), ordered_commits.index(commit)
                         res = detect_extract_method_from_commit(p, commit)
                         if len(res) != 0:
-                            res[0]['a_commit_index'] = ordered_commits.index(p)
-                            res[0]['b_commit_index'] = ordered_commits.index(commit)
-                            extract_method_information.extend(res)
+                            for re in res:
+                                re['a_commit_index'] = ordered_commits.index(p)
+                                re['b_commit_index'] = ordered_commits.index(commit)
+                            print_csv(res)
                         checked_commit_pair.add((commit.hexsha, p.hexsha))
                         detection_queue.append(p)
 
@@ -252,9 +260,11 @@ def print_csv(candidates):
         for candidate in candidates:
             candidate['target_deleted_lines'] = '\n'.join(candidate['target_deleted_lines'])
 
-        writer = csv.DictWriter(sys.stdout, fieldnames)
-        writer.writeheader()
+        f = open('./res.csv', 'a')
+        writer = csv.DictWriter(f, fieldnames)
+        #writer.writeheader()
         writer.writerows(candidates)
+        f.close()
 
 if __name__ == '__main__':
     import argparse
@@ -265,21 +275,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     historage = Repo(args.historage_dir)
-    extract_method_information = detect_extract_method(historage)
+    #extract_method_information = detect_extract_method(historage)
     extract_method_information_multi = detect_extract_method_multi(historage)
-
-    candidate_revisions = set()
-    for info in extract_method_information:
-        candidate_revisions.add(info["a_commit"])
-
-    candidate_revisions_multi = set()
-    for info in extract_method_information_multi:
-        candidate_revisions_multi.add(info["a_commit"])
-
-    print('candidates:', len(extract_method_information))
-    print('candidate revisions:', len(candidate_revisions))
-    print('candidates multi:', len(extract_method_information_multi))
-    print('candidate revisions multi:', len(candidate_revisions_multi))
 
     #print_csv(extract_method_information)
     #print_csv(extract_method_information_multi)
+
+    #candidate_revisions = set()
+    #for info in extract_method_information:
+        #candidate_revisions.add(info["a_commit"])
+
+    #candidate_revisions_multi = set()
+    #for info in extract_method_information_multi:
+        #candidate_revisions_multi.add(info["a_commit"])
+
+    #print >> sys.stderr, ('candidates:', len(extract_method_information))
+    #print >> sys.stderr, ('candidate revisions:', len(candidate_revisions))
+    #print('candidates multi:', len(extract_method_information_multi))
+    #print('candidate revisions multi:', len(candidate_revisions_multi))
